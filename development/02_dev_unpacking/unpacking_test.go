@@ -5,7 +5,10 @@ import (
 	"testing"
 )
 
+// тестируем функцию распаковки строки
 func TestUnpacking(t *testing.T) {
+	// создаем наборы для тестирования
+	// с разными вариантами входящих и исходящих данных
 	testTable := []struct {
 		str         string
 		expectedVal string
@@ -31,11 +34,19 @@ func TestUnpacking(t *testing.T) {
 			expectedVal: "",
 			expectedErr: nil,
 		},
+		{
+			str:         "a4bv2c0a2",
+			expectedVal: "aaaabvvaa",
+			expectedErr: nil,
+		},
 	}
 
+	// проходим по ним и используем функцию распаковки
 	for _, testCase := range testTable {
 		result, err := unpacking(testCase.str)
 
+		// если полученный результат совпадает с ожидаемым, то все в порядке
+		// если нет, то выводим это
 		if result != testCase.expectedVal && err != testCase.expectedErr {
 			t.Errorf("Incorrect result. Expect val: %s, err:%v. Got %s, %v\n", testCase.expectedVal, testCase.expectedErr, result, err)
 		}
