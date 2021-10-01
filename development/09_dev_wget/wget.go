@@ -14,12 +14,14 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// функция для проверки ошибок
 func checkError(err error) {
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
+// функция для получения страницы по url с возможностью передать timeout
 func HTTPGet(url string, timeout time.Duration) (content []byte, err error) {
 	request, err := http.NewRequest("GET", url, nil)
 	checkError(err)
@@ -28,37 +30,42 @@ func HTTPGet(url string, timeout time.Duration) (content []byte, err error) {
 		Timeout: timeout,
 	}
 
+	// делаем запрос
 	response, err := client.Do(request)
 	checkError(err)
 
 	defer response.Body.Close()
 
+	// если статус не ОК, возвращаем ошибку
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("Error.Status: %s", response.Status)
 	}
 
+	// возвращаем тело запроса
 	return ioutil.ReadAll(response.Body)
 }
 
 func main() {
+	// задаем страндартные фраги
 	url := flag.String("url", "https://algolist.ru/", "url")
 	timeout := flag.Duration("timeout", 5*time.Second, "timeout")
 	output_path := flag.String("output", "test.html", "output path")
 
 	flag.Parse()
 
+	// получаем информацию с основной страницы
 	content, err := HTTPGet(*url, *timeout)
 	checkError(err)
 
-	// Сохраняем основную страницу
+	// сохраняем основную страницу
 	err = ioutil.WriteFile(*output_path, content, 0666)
 	checkError(err)
 
-	// Сохраняем все страницы с сайта
+	// сохраняем все страницы с сайта
 	WriteFile(*url, LinkScrape(*url))
 }
 
-// Получаем все ссылки с сайта
+// получаем все ссылки с сайта
 func LinkScrape(url string) []string {
 	resp, err := http.Get(url)
 	checkError(err)
@@ -75,7 +82,7 @@ func LinkScrape(url string) []string {
 	return links
 }
 
-// Записываем все в html файлы
+// записываем все в html файлы
 func WriteFile(url string, links []string) {
 	for i, l := range links {
 		resp, err := http.Get(url + l)
