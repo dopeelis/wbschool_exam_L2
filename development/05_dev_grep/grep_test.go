@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// функция проверки равенства слайсов
 func Equal(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -16,6 +17,7 @@ func Equal(a, b []string) bool {
 	return true
 }
 
+// тестирование простого поиска
 func TestSimpleSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -67,6 +69,7 @@ func TestSimpleSearch(t *testing.T) {
 	}
 }
 
+// тестирование поиска с выводом количества совпадений
 func TestCountSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -114,6 +117,7 @@ func TestCountSearch(t *testing.T) {
 
 }
 
+// тестирование поиска с доп выводом номера строки
 func TestLineNumSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -165,6 +169,7 @@ func TestLineNumSearch(t *testing.T) {
 	}
 }
 
+// тестирование поисках строк, НЕ содержащих фразу
 func TestInvertSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -227,6 +232,7 @@ func TestInvertSearch(t *testing.T) {
 	}
 }
 
+// тестирование поиска строк с полным совпадением
 func TestFixedtSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -275,6 +281,7 @@ func TestFixedtSearch(t *testing.T) {
 	}
 }
 
+// тестирование поиска с игнорированием регистра
 func TestIgnoreCaseSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -326,6 +333,7 @@ func TestIgnoreCaseSearch(t *testing.T) {
 	}
 }
 
+// тестирование поиска с выводом n строчек после найденной
 func TestASearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -386,6 +394,7 @@ func TestASearch(t *testing.T) {
 	}
 }
 
+// тестирование поиска с выводом n строчек до найденной
 func TestBSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
@@ -445,6 +454,7 @@ func TestBSearch(t *testing.T) {
 	}
 }
 
+// тестирование поиска с выводом n строчек до и после найденной
 func TestCSearch(t *testing.T) {
 	testTable := []struct {
 		phrase   string
