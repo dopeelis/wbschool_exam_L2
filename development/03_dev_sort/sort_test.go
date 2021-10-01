@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 )
 
+// функция для сравнения двух слайсов
 func Equal(a, b []string) bool {
+	// сразу проверяем размер
 	if len(a) != len(b) {
 		return false
 	}
@@ -17,6 +18,7 @@ func Equal(a, b []string) bool {
 	return true
 }
 
+// тестируем обычную сортировку
 func TestStrSort(t *testing.T) {
 	testTable := []struct {
 		strs     []string
@@ -40,6 +42,7 @@ func TestStrSort(t *testing.T) {
 	}
 }
 
+// тестируем обратную сортировку
 func TestReverseSort(t *testing.T) {
 	testTable := []struct {
 		strs     []string
@@ -63,6 +66,7 @@ func TestReverseSort(t *testing.T) {
 	}
 }
 
+// тестируем сортировку без повторов
 func TestSortWithoutRepeat(t *testing.T) {
 	testTable := []struct {
 		strs     []string
@@ -86,6 +90,7 @@ func TestSortWithoutRepeat(t *testing.T) {
 	}
 }
 
+// тестируем сортировку по числу
 func TestIntSort(t *testing.T) {
 	testTable := []struct {
 		strs     []string
@@ -109,6 +114,7 @@ func TestIntSort(t *testing.T) {
 	}
 }
 
+// тестируем сортировку по колонке
 func TestColumnSort(t *testing.T) {
 	testTable := []struct {
 		strs      []string
@@ -130,13 +136,6 @@ func TestColumnSort(t *testing.T) {
 	for _, testCase := range testTable {
 		result := columnSort(testCase.strs, testCase.columnNum-1)
 		if !Equal(result, testCase.expected) {
-			for i, s := range result {
-				fmt.Println(i, s)
-			}
-			for i, s := range testCase.expected {
-				fmt.Println(i, s)
-			}
-
 			t.Errorf("Incorrect result. Expect: %v, Got %v\n", testCase.expected, result)
 		}
 	}
