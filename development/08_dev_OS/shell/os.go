@@ -11,6 +11,7 @@ import (
 	"github.com/mitchellh/go-ps"
 )
 
+// функция для проверки ошибок
 func checkErr(err error) {
 	if err != nil {
 		log.Fatalln()
@@ -18,12 +19,15 @@ func checkErr(err error) {
 }
 
 func main() {
+	// бесконечный цикл для чтения команд
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		request, err := reader.ReadString('\n')
 		checkErr(err)
 		splitRequest := strings.Split(request, " ")
+		// распознаем команду
 		switch splitRequest[0] {
+		// завершаем программу, если exit
 		case "exit\n":
 			return
 		case "cd":
@@ -42,13 +46,16 @@ func main() {
 	}
 }
 
+// возвращаем значение текущего пути
 func pwd() string {
 	wd, err := os.Getwd()
 	checkErr(err)
 	return wd
 }
 
+// меняем директорию
 func cd(location []string) {
+	// если нужно вернуться на уровень выше
 	if location[0] == "-\n" {
 		var currDir string
 		splitDir := strings.Split(pwd(), "/")
@@ -59,6 +66,7 @@ func cd(location []string) {
 		checkErr(err)
 		fmt.Println(pwd())
 	} else {
+		// если нужно двигаться дальше
 		var path string
 		for _, w := range location {
 			path += w
@@ -72,6 +80,7 @@ func cd(location []string) {
 }
 
 func echo(s []string) {
+	// показываем все файлы в текущей директории
 	if s[0] == "*\n" || string(s[0][0]) == "*" {
 		if len(s[0]) == 1 {
 			files, err := ioutil.ReadDir(".")
@@ -81,6 +90,7 @@ func echo(s []string) {
 				fmt.Println(file.Name(), "| is dir:", file.IsDir())
 			}
 		} else {
+			// если указано конкретное расширение
 			files, err := ioutil.ReadDir(".")
 			checkErr(err)
 			for _, file := range files {
@@ -97,7 +107,7 @@ func echo(s []string) {
 
 			}
 		}
-
+		// повторяем введенную строку
 	} else {
 		var out string
 		for _, w := range s {
@@ -119,10 +129,12 @@ func echo(s []string) {
 	}
 }
 
+// сигнал для остановки конкретного приложения
 func kill(s []string) {
 
 }
 
+// возвращаем все текущие процессы
 func prs() []ps.Process {
 	prs, err := ps.Processes()
 	checkErr(err)
