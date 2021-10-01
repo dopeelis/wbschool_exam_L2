@@ -2,6 +2,7 @@ package main
 
 import "testing"
 
+// функция сравнения двух слайсов
 func Equal(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -14,6 +15,7 @@ func Equal(a, b []string) bool {
 	return true
 }
 
+// тестирование функции "вырезания" по колонке
 func TestFields(t *testing.T) {
 	testTable := []struct {
 		field    int
@@ -56,6 +58,7 @@ func TestFields(t *testing.T) {
 	}
 }
 
+// тестирование функции "вырезания" по колонке и разделителю
 func TestDelimiter(t *testing.T) {
 	testTable := []struct {
 		field     int
@@ -103,6 +106,7 @@ func TestDelimiter(t *testing.T) {
 	}
 }
 
+// // тестирование функции "вырезания" по колонке строк с разделителем
 func TestSeparated(t *testing.T) {
 	testTable := []struct {
 		field    int
