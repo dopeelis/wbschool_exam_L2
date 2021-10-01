@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// функция сравнения двух слайсов
 func Equal(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -16,6 +17,7 @@ func Equal(a, b []string) bool {
 	return true
 }
 
+// тестируем функцию получения анаграмм
 func TestGetAnagrams(t *testing.T) {
 	testTable := []struct {
 		data        []string
@@ -40,6 +42,7 @@ func TestGetAnagrams(t *testing.T) {
 
 	for _, testCase := range testTable {
 		result := getAnagrams(testCase.data)
+		// сразу исключаем несовпадение, чтобы не проходить по циклу, если разное количество ключей
 		if len(result) != len(testCase.anagramsMap) {
 			t.Errorf("Incorrect result. Expect: %v, Got %v\n", testCase.anagramsMap, result)
 		}
