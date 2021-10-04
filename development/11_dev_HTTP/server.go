@@ -2,160 +2,339 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
-	"sync"
+	"time"
 )
 
-var userCount int = 1
-var usersStore *userStore = &userStore{uStore: make(map[string]User)}
+// для парсинга времени в нужном формате
+const (
+	layout1 = `"` + "2006-01-02" + `"`
+	layout2 = "2006-01-02"
+	layout3 = "2006-01"
+)
 
-type User struct {
-	ID         string                       `json:"user id"`
-	Name       string                       `json:"user name"`
-	EventCount int                          `json:"user event count"`
-	EventStore map[string]map[string]string `json:"-"`
-}
+func main() {
+	service := NewService()
+	handler := NewHandler(service)
 
-type userStore struct {
-	uStore map[string]User
-	sync.RWMutex
+	mux := handler.InitRoutes()
+
+	err := http.ListenAndServe(":8080", mux)
+	if err != nil {
+		ErrorResponse(nil, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 type Event struct {
-	UserName  string `json:"user"`
-	ID        string `json:"event id"`
-	Title     string `json:"title"`
-	Date      string `json:"date"`
-	TimeStart string `json:"time start"`
-	TimeEnd   string `json:"time end"`
+	UserID      int    `json:"user_id"`
+	EventID     int    `json:"event_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Date        Date   `json:"date"`
 }
 
-func newUser(name string) *User {
-	u := &User{ID: strconv.Itoa(userCount), Name: name, EventCount: 0}
-	u.EventStore = make(map[string]map[string]string)
-	usersStore.addUserToMap(u)
-	userCount++
-	return u
+// Date - свой формат даты
+type Date struct {
+	time.Time
 }
 
-func newEvent(u *User, title string, date string, timeStart string, tineEnd string) *Event {
-	u.EventCount = u.EventCount + 1
-	e := &Event{UserName: u.Name, ID: strconv.Itoa(u.EventCount), Title: title, Date: date, TimeStart: timeStart, TimeEnd: tineEnd}
+// Events - хранилище все событий
+var Events []Event
 
-	u.addEvent(e)
-
-	return e
-}
-
-func (u *User) addEvent(e *Event) {
-	mu := new(sync.RWMutex)
-	mu.Lock()
-	u.EventStore[e.ID] = map[string]string{
-		"title":      e.Title,
-		"date":       e.Date,
-		"time start": e.TimeStart,
-		"time end":   e.TimeEnd,
+// UnmarshalJSON - функция для возможности ввода даты в нужном нам формате
+func (t *Date) UnmarshalJSON(date []byte) error {
+	if string(date) == "" || string(date) == `""` || string(date) == "null" {
+		*t = Date{time.Now()}
+		return nil
 	}
-	mu.Unlock()
+	tm, err := time.Parse(layout1, string(date))
+	*t = Date{tm}
+	return err
 }
 
-func (uS *userStore) addUserToMap(u *User) {
-	uS.Lock()
-	uS.uStore[u.ID] = *u
-	uS.Unlock()
+// IEvent - содержит поддерживаемые методы
+type IEvent interface {
+	CreateEvent(userID int, eventID int, title string, description string, date Date) error
+	UpdateEvent(userID int, eventID int, title string, description string, date Date) error
+	DeleteEvent(eventID int) error
+	EventsForDay(date Date) ([]Event, error)
+	EventsForWeek(date Date) ([]Event, error)
+	EventsForMonth(date Date) ([]Event, error)
 }
 
-func main() {
-	Bob := newUser("Bob")
-	Lisa := newUser("Lisa")
-
-	newEvent(Lisa, "Egor's DoB", "2021-10-24", "00:00", "23:59")
-	newEvent(Bob, "Daily meeting", "2021-09-23", "12:50", "13:30")
-
-	// newEvent(Lisa, "WB exam", "2021-10-01", "18:00", "21:00")
-
-	http.HandleFunc("/", middleware(queryPar))
-
-	host := ":8000"
-	err := http.ListenAndServe(host, nil)
-	if err != nil {
-		log.Println("Error: 'listen and serve at host'", host, err.Error())
-	}
+// Service - сервис, отвечающий за выполнение методов
+type Service struct {
+	IEvent
 }
 
-func queryPar(rw http.ResponseWriter, r *http.Request) {
-	if r.FormValue("user_id") != "" {
-		if _, ok := usersStore.uStore[r.FormValue("user_id")]; ok {
+func NewService() *Service {
+	return &Service{NewEventsManager()}
+}
 
-			user := usersStore.uStore[r.FormValue("user_id")]
-			if r.FormValue("date") == "" {
-				_, err := rw.Write([]byte(fmt.Sprintf("Hi, %s! This is your awesome calendar\n", user.Name)))
-				if err != nil {
-					log.Println("Error: can't write text on user{id} page", err.Error())
-				}
-				rw.Header().Set("Content-Type", "application/json")
-				rw.WriteHeader(http.StatusOK)
-				jsonBytes, err := json.Marshal(user)
-				if err != nil {
-					log.Println("can't display user info")
-				}
-				rw.Write([]byte(fmt.Sprintln("\nUser info: ")))
-				rw.Write(jsonBytes)
-				rw.Write([]byte(fmt.Sprintln(" ")))
-			}
+// EventsManager - менеджер, осуществляющий методы
+type EventsManager struct {
+}
 
-			if r.FormValue("date") != "" {
-				count := len(user.EventStore)
-				for k, v := range user.EventStore {
-					if v["date"] == r.FormValue("date") {
-						_, err := rw.Write([]byte(fmt.Sprintf("Hi, %s!\n\nThis is events for day %s:\n\n", user.Name, r.FormValue("date"))))
-						if err != nil {
-							log.Println("Error: can't write text on user{id} & event{date} page", err.Error())
-						}
-						count--
-						rw.Header().Set("Content-Type", "application/json")
-						rw.WriteHeader(http.StatusOK)
-						data := user.EventStore[k]
-						jsonBytes, err := json.Marshal(data)
-						if err != nil {
-							log.Println("can't display data")
-						}
-						rw.Write(jsonBytes)
-					} else {
-						continue
-					}
-				}
-				if count == len(user.EventStore) {
-					rw.WriteHeader(http.StatusNotFound)
-					rw.Write([]byte(`"error":"not found"`))
-				}
-			}
+func NewEventsManager() *EventsManager {
+	return &EventsManager{}
+}
 
-		} else {
-			rw.WriteHeader(http.StatusNotFound)
-			rw.Write([]byte(`"error":"not found"`))
+// CreateEvent - функция непосредствееного создания события менеджером
+func (e *EventsManager) CreateEvent(userID int, eventID int, title string, description string, date Date) error {
+	event := Event{UserID: userID, EventID: eventID, Title: title, Description: description, Date: date}
+	Events = append(Events, event)
+	return nil
+}
+
+// UpdateEvent - функция изменения информации о событии менеджером
+func (e *EventsManager) UpdateEvent(userID int, eventID int, title string, description string, date Date) error {
+	var exist bool // проверка на существование события
+	var index int
+	for i, e := range Events {
+		if e.EventID == eventID {
+			exist = true
+			index = i
+			break
 		}
-	} else {
-		homePage(rw, r)
+	}
+	if !exist {
+		return errors.New("event doesn't exist")
 	}
 
+	Events[index].UserID = userID
+	Events[index].Date = date
+	Events[index].Title = title
+	Events[index].Description = description
+	return nil
 }
 
-func homePage(rw http.ResponseWriter, r *http.Request) {
-	rw.WriteHeader(http.StatusOK)
+// DeleteEvent - функция удаление события менеджером
+func (e *EventsManager) DeleteEvent(eventID int) error {
+	var exist bool // проверка на существование события
+	var index int
+	for i, e := range Events {
+		if e.EventID == eventID {
+			exist = true
+			index = i
+			break
+		}
+	}
+	if !exist {
+		return errors.New("event doesn't exist")
+	}
+	Events[index] = Events[len(Events)-1]
+	Events = Events[:len(Events)-1]
+	return nil
+}
 
-	_, err := rw.Write([]byte("Hi! This is your awesome calendar"))
+// EventsForDay - функция вывода событий за день менеджером
+func (e *EventsManager) EventsForDay(date Date) ([]Event, error) {
+	var DayEvents []Event
+	for _, e := range Events {
+		if date.Day() == e.Date.Day() && date.Month() == e.Date.Month() && date.Year() == e.Date.Year() {
+			DayEvents = append(DayEvents, e)
+		}
+	}
+	return DayEvents, nil
+}
+
+// EventsForWeek - функция вывода событий за неделю менеджером
+func (e *EventsManager) EventsForWeek(date Date) ([]Event, error) {
+	var WeekEvents []Event
+	for _, e := range Events {
+		year1, week1 := date.ISOWeek()
+		year2, week2 := e.Date.ISOWeek()
+		if year1 == year2 && week1 == week2 {
+			WeekEvents = append(WeekEvents, e)
+		}
+	}
+	return WeekEvents, nil
+}
+
+// EventsForMonth - функция вывода событий за месяц менеджером
+func (e *EventsManager) EventsForMonth(date Date) ([]Event, error) {
+	var MonthEvents []Event
+	for _, e := range Events {
+		if date.Month() == e.Date.Month() && date.Year() == e.Date.Year() {
+			MonthEvents = append(MonthEvents, e)
+		}
+	}
+	return MonthEvents, nil
+}
+
+// errorResponse - структура вывода ошибок
+type errorResponse struct {
+	Err string `json:"error"`
+}
+
+// ErrorResponse - функция вывода ошибок
+func ErrorResponse(w http.ResponseWriter, err string, status int) {
+	jsonError, _ := json.Marshal(&errorResponse{err})
+	http.Error(w, string(jsonError), status)
+}
+
+// resultResponse - структура вывода результатов
+type resultResponse struct {
+	Result []Event `json:"result"`
+}
+
+// ResultResponse - функция вывода результатов
+func ResultResponse(w http.ResponseWriter, res []Event) {
+	jsonError, _ := json.Marshal(&resultResponse{res})
+	_, err := w.Write(jsonError)
 	if err != nil {
-		log.Println("Error: can't write []byte on home page", err.Error())
+		ErrorResponse(w, err.Error(), http.StatusBadGateway)
 	}
 }
 
-func middleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		log.Println("Request info: ", r)
-		next(rw, r)
+// Handler - обработчик сервисов
+type Handler struct {
+	Services *Service
+}
+
+func NewHandler(services *Service) *Handler {
+	return &Handler{Services: services}
+}
+
+// jsonDecode - функция обработки файла json для представления события
+func (h *Handler) jsonDecode(w http.ResponseWriter, r *http.Request) *Event {
+	var event Event
+	err := json.NewDecoder(r.Body).Decode(&event)
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusBadRequest)
+		return nil
+	}
+	return &event
+}
+
+// createEvent(Handler) - функция создания события обработчиком и конечный вывод
+func (h *Handler) createEvent(w http.ResponseWriter, r *http.Request) {
+	event := h.jsonDecode(w, r)
+	if event == nil {
+		return
+	}
+	err := h.Services.CreateEvent(event.UserID, event.EventID, event.Title, event.Description, event.Date)
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ResultResponse(w, Events)
+}
+
+// updateEvent(Handler) - функция обновления события обработчиком и конечный вывод
+func (h *Handler) updateEvent(w http.ResponseWriter, r *http.Request) {
+	event := h.jsonDecode(w, r)
+	if event == nil {
+		return
+	}
+	err := h.Services.UpdateEvent(event.UserID, event.EventID, event.Title, event.Description, event.Date)
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ResultResponse(w, Events)
+}
+
+// deleteEvent(Handler) - функция удаления события обработчиком и конечный вывод
+func (h *Handler) deleteEvent(w http.ResponseWriter, r *http.Request) {
+	event := h.jsonDecode(w, r)
+	if event == nil {
+		return
+	}
+	err := h.Services.DeleteEvent(event.EventID)
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ResultResponse(w, Events)
+}
+
+// eventsForDay(Handler) - функция вывода событий за день обработчиком
+func (h *Handler) eventsForDay(w http.ResponseWriter, r *http.Request) {
+	date := r.URL.Query().Get("date")
+	eventTime, err := time.Parse(layout2, date)
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	_, err = w.Write([]byte(fmt.Sprint(eventTime.Format(layout2)) + "\n"))
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	events, err := h.Services.EventsForDay(Date{eventTime})
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ResultResponse(w, events)
+}
+
+// eventsForWeek(Handler) - функция вывода событий за неделю обработчиком
+func (h *Handler) eventsForWeek(w http.ResponseWriter, r *http.Request) {
+	date := r.URL.Query().Get("date")
+	eventTime, err := time.Parse(layout2, date)
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	_, err = w.Write([]byte(fmt.Sprint(eventTime.Format(layout2)) + "\n"))
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	events, err := h.Services.EventsForWeek(Date{eventTime})
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ResultResponse(w, events)
+}
+
+// eventsForMonth(Handler) - функция вывода событий за месяц обработчиком
+func (h *Handler) eventsForMonth(w http.ResponseWriter, r *http.Request) {
+	date := r.URL.Query().Get("date")
+	eventTime, err := time.Parse(layout3, date)
+	if err != nil {
+		eventTime, err = time.Parse(layout2, date)
+		if err != nil {
+			ErrorResponse(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	_, err = w.Write([]byte(fmt.Sprint(eventTime.Month()) + " " + fmt.Sprint(eventTime.Year()) + "\n"))
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	events, err := h.Services.EventsForMonth(Date{eventTime})
+	if err != nil {
+		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ResultResponse(w, events)
+}
+
+func (h *Handler) InitRoutes() *http.ServeMux {
+	mux := &http.ServeMux{}
+
+	mux.HandleFunc("/create_event", LogMiddleware(http.HandlerFunc(h.createEvent)))
+	mux.HandleFunc("/update_event", LogMiddleware(http.HandlerFunc(h.updateEvent)))
+	mux.HandleFunc("/delete_event", LogMiddleware(http.HandlerFunc(h.deleteEvent)))
+	mux.HandleFunc("/events_for_day", LogMiddleware(http.HandlerFunc(h.eventsForDay)))
+	mux.HandleFunc("/events_for_week", LogMiddleware(http.HandlerFunc(h.eventsForWeek)))
+	mux.HandleFunc("/events_for_month", LogMiddleware(http.HandlerFunc(h.eventsForMonth)))
+
+	return mux
+}
+
+// LogMiddleware - функция логирования запросов
+func LogMiddleware(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Request: Method " + r.Method + ", Url " + r.RequestURI)
+		next.ServeHTTP(w, r)
 	}
 }
