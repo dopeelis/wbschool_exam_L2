@@ -60,8 +60,7 @@ func Run(nc *NetCatClient) error {
 	osSignals := make(chan os.Signal, 1)
 	errors := make(chan error, 1)
 	signal.Notify(osSignals, syscall.SIGINT, syscall.SIGTERM)
-	go req(conn, errors, osSignals)
-	go resp(conn, errors, osSignals)
+	go Send(conn, errors, osSignals)
 
 	select {
 	case <-osSignals:
@@ -77,37 +76,21 @@ func Run(nc *NetCatClient) error {
 	return nil
 }
 
-func req(conn net.Conn, chanErr chan<- error, chanOsSignals chan<- os.Signal) {
+func Send(conn net.Conn, errors chan<- error, osSignals chan<- os.Signal) {
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		text, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				chanOsSignals <- syscall.Signal(syscall.SIGQUIT)
+				osSignals <- syscall.Signal(syscall.SIGQUIT)
 				return
 			}
-			chanErr <- err
+			errors <- err
 		}
 
-		_, err = fmt.Fprintf(conn, text+"\n")
+		_, err = conn.Write([]byte(text))
 		if err != nil {
 			log.Fatalln(err)
 		}
-	}
-}
-
-func resp(conn net.Conn, chanErr chan<- error, chanOsSignals chan<- os.Signal) {
-	for {
-		reader := bufio.NewReader(conn)
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				chanOsSignals <- syscall.Signal(syscall.SIGQUIT)
-				return
-			}
-			chanErr <- err
-		}
-
-		fmt.Print(text)
 	}
 }
