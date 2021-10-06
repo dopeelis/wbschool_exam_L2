@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/urfave/cli/v2"
 	"io"
 	"log"
 	"net"
@@ -10,27 +11,70 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/urfave/cli/v2"
 )
+
+type TelnetClient struct {
+	host    string
+	port    string
+	timeout time.Duration
+	conn    net.Conn
+}
+
+func NewTelnetClient(host string, port string, timeout time.Duration) *TelnetClient {
+	return &TelnetClient{
+		host:    host,
+		port:    port,
+		timeout: timeout,
+	}
+}
+
+func (t *TelnetClient) Connection() error {
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(t.host, t.port), t.timeout)
+	if err != nil {
+		return fmt.Errorf("conncetion error: %v", err)
+	}
+	t.conn = conn
+	fmt.Println("connected to ", t.host+":"+t.port)
+	return nil
+}
+
+func (t *TelnetClient) Receive() error {
+	reader := bufio.NewReader(t.conn)
+	text, err := reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			err = fmt.Errorf("error: closed")
+		}
+		return err
+	}
+	_, err = fmt.Print(text)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *TelnetClient) Send(text string) error {
+	_, err := t.conn.Write([]byte(text))
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func main() {
 	app := &cli.App{}
-	app.UseShortOptionHandling = true
 	app.Commands = []*cli.Command{
 		{
 			Name:  "go-telnet",
 			Usage: "telnet client realization",
 			Flags: []cli.Flag{
-				&cli.IntFlag{Name: "timeout"},
+				&cli.DurationFlag{Name: "timeout"},
 			},
 			Action: func(c *cli.Context) error {
-				telnet := InitFlags(c.Args().Slice()[0], c.Args().Slice()[1], c.Int("timeout"))
-				err := telnet.Run()
-				if err != nil {
-					fmt.Println(err)
-				}
-				return err
+				client := NewTelnetClient(c.Args().Slice()[0], c.Args().Slice()[1], c.Duration("timeout"))
+				Run(client)
+				return nil
 			},
 		},
 	}
@@ -40,71 +84,65 @@ func main() {
 	}
 }
 
-type Flags struct {
-	host    string
-	port    string
-	timeout time.Duration
-}
-
-func InitFlags(host, port string, timeout int) *Flags {
-	return &Flags{
-		host:    host,
-		port:    port,
-		timeout: time.Duration(timeout),
-	}
-}
-
-func (f *Flags) Run() error {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(f.host, f.port), f.timeout)
+func Run(client *TelnetClient) {
+	err := client.Connection()
 	if err != nil {
-		time.Sleep(f.timeout)
-		return err
+		log.Fatalf("connecting error: %v\n", err)
 	}
-	chanOsSignals := make(chan os.Signal, 1)
-	chanErr := make(chan error, 1)
-	signal.Notify(chanOsSignals, syscall.SIGINT, syscall.SIGTERM)
-	go req(conn, chanErr, chanOsSignals)
-	go resp(conn, chanErr, chanOsSignals)
-
-	select {
-	case <-chanOsSignals:
-		conn.Close()
-	case err = <-chanErr:
+	defer func() {
+		err := client.conn.Close()
 		if err != nil {
-			return err
+			log.Fatalf("closing connection error: %v\n", err)
 		}
-	}
-	return nil
-}
+	}()
 
-func req(conn net.Conn, chanErr chan<- error, chanOsSignals chan<- os.Signal) {
-	for {
+	osSignals := make(chan os.Signal, 1)
+	signal.Notify(osSignals, syscall.SIGINT, syscall.SIGTERM)
+	errors := make(chan error, 1)
+
+	go func() {
+		for {
+			err := client.Receive()
+			if err != nil {
+				errors <- err
+				return
+			}
+		}
+	}()
+
+	go func() {
 		reader := bufio.NewReader(os.Stdin)
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				chanOsSignals <- syscall.Signal(syscall.SIGQUIT)
+		for {
+			text, err := reader.ReadString('\n')
+			if err != nil {
+				errors <- err
 				return
 			}
-			chanErr <- err
-		}
-
-		fmt.Fprintf(conn, text+"\n")
-	}
-}
-
-func resp(conn net.Conn, chanErr chan<- error, chanOsSignals chan<- os.Signal) {
-	for {
-		reader := bufio.NewReader(conn)
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				chanOsSignals <- syscall.Signal(syscall.SIGQUIT)
+			err = client.Send(text)
+			if err != nil {
+				errors <- err
 				return
 			}
-			chanErr <- err
 		}
+	}()
 
-		fmt.Print(text)
-	}
+	exit := make(chan interface{})
+	go func() {
+		defer close(exit)
+		for {
+			select {
+			case <-osSignals:
+				return
+			case err := <-errors:
+				log.Println(err)
+				if err != nil {
+					return
+				}
+			default:
+				continue
+			}
+		}
+	}()
+
+	<-exit
 }
