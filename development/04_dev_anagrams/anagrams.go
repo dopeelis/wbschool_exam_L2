@@ -7,55 +7,39 @@ import (
 
 // функция для получения анаграм
 func getAnagrams(arr []string) map[string][]string {
-	// создаем мап, куда будем складывать результат
-	res := make(map[string][]string)
+	// создаем мап, куда будем складывать промежуточный результат
+	interimRes := make(map[string][]string)
 
-	// приводим все к нижнему регистру
-	// и добавляем все слова как ключи в мапе
+	// создаем мап, куда будем складывать конечный результат
+	finalRes := make(map[string][]string)
+
+	// проходим циклом по всему списку
 	for _, i := range arr {
-		i = strings.ToLower(i)
-		res[i] = []string{}
-	}
-
-	// проходим по ключам и исключаем те, что являются анаграммами
-	for k := range res {
-		for _, i := range arr {
-			i = strings.ToLower(i)
-			sortStr := SortString(i)
-			sortKey := SortString(k)
-			if i == k {
-				break
-			}
-			if sortStr == sortKey {
-				delete(res, k)
-			}
+		// приводим к нижнему регистру
+		lowerI := strings.ToLower(i)
+		// сортируем строку
+		sortI := SortString(lowerI)
+		// если остортированное слово уже является ключом,
+		// добавляем само слово в значение к этому ключу
+		if _, ok := interimRes[sortI]; ok {
+			interimRes[sortI] = append(interimRes[sortI], lowerI)
+			//	если нет, то объявляем сортированное слово ключом и добавляем обычное слоово в значение
+		} else {
+			interimRes[sortI] = []string{lowerI}
 		}
 	}
 
-	// проходим по словам и добавляем в мап, если являются анаграммой к ключу
-	for _, i := range arr {
-		i = strings.ToLower(i)
-		for k := range res {
-			sortStr := SortString(i)
-			sortKey := SortString(k)
-			if i == k {
-				break
-			}
-			if sortStr == sortKey {
-				res[k] = append(res[k], i)
-			}
+	// проходим по промежуточной мапе
+	for _, v := range interimRes {
+		// если состоит из 1 слова, то пропускаем
+		if len(v) <= 1 {
+			continue
 		}
+		// иначе ставим первое слово ключом, остальные слова - значением
+		finalRes[v[0]] = v[1:]
 	}
 
-	// убираем ключи без значений
-	// т.е. без анаграмм
-	for k, v := range res {
-		if len(v) == 0 {
-			delete(res, k)
-		}
-	}
-
-	return res
+	return finalRes
 }
 
 // реализация сортировки строки по элементам
