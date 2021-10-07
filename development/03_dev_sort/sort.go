@@ -5,25 +5,31 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// описываем общую функцию проверки ошибок
+// checkError общая функцию проверки ошибок
 func checkError(err error) {
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func main() {
-	// проверяем, все ли данные введены
-	if len(os.Args) == 1 {
-		panic("No file to sort")
+// Find функция для нахождения элемента в слайсе
+func Find(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		} else {
+			continue
+		}
 	}
+	return false
+}
 
+func main() {
 	// задаем флаги
 	k := flag.Int("k", 1, "указание колонки для сортировки")
 	n := flag.Bool("n", false, "сортировать по числовому значению")
@@ -32,141 +38,129 @@ func main() {
 
 	flag.Parse()
 
-	// если не было добавлено флагов, то запуска обычную сортировку
-	if !*n && !*r && !*u && *k == 1 {
-		f := os.Args[1]
-		file, err := ioutil.ReadFile(f) //читаем данные из файла
-		checkError(err)
-
-		splitStr := strings.Split(string(file), "\n")
-
-		fmt.Println(strSort(splitStr))
+	args := flag.Args()
+	if len(args) != 1 {
+		log.Fatalln("usage: [flags] [file]")
 	}
 
-	// если какой-то флаг был добавлен
-	if *k != 1 || *n || *r || *u {
-		f := os.Args[2]
-		file, err := ioutil.ReadFile(f) //читаем данные из файла
-		checkError(err)
-		splitStr := strings.Split(string(file), "\n")
+	file, err := ioutil.ReadFile(args[0])
+	checkError(err)
 
-		// если указана колонка для сортировки
-		if *k != 1 {
-			fmt.Println(columnSort(splitStr, *k-1))
-		}
-		// если необходимо сортировать по числовому значению
-		if *n {
-			fmt.Println(intSort(splitStr))
-		}
-		// если нужна сортировка в обратном порядке
-		if *r {
-			fmt.Println(reverseSort(splitStr))
-		}
-		// если не нужны повторяющиеся строки
-		if *u {
-			fmt.Println(sortWithoutRepeat(splitStr))
-		}
-	}
+	splitStr := strings.Split(string(file), "\n")
 
+	fmt.Println(strSort(splitStr, *k-1, *n, *r, *u))
 }
 
-// простая сортировка
-func strSort(s []string) []string {
-	sort.Strings(s)
-	return s
-}
+func strSort(arr []string, k int, n, r, u bool) []string {
+	var trueKey string
+	// промежуточная мапа
+	interimMap := make(map[string]string)
+	// ключи для промежуточной мапы
+	var keyArr []string
+	var intKeyArr []int
+	// конечный результат
+	var allStr []string
 
-// обратная сортировка
-func reverseSort(s []string) []string {
-	sort.Sort(sort.Reverse(sort.StringSlice(s)))
-	return s
-}
-
-// сортировка без повторяющихся строк
-func sortWithoutRepeat(s []string) []string {
-	strWithoutRepeat := []string{}
-	m := make(map[string]struct{})
-	exists := struct{}{}
-	// проходим по всем строкам и добавляем их в мап
-	// повторяющиемся не будут добавлены
-	for _, i := range s {
-		m[i] = exists
-	}
-	// проходим по оставшимся в мапе
-	// добавляем их к результату
-	for i := range m {
-		strWithoutRepeat = append(strWithoutRepeat, i)
-	}
-	// сортируем их
-	sort.Strings(strWithoutRepeat)
-	return strWithoutRepeat
-}
-
-// сортировка по числовому значению
-func intSort(s []string) []string {
-	m := make(map[int]string)
-	str := []string{}
-	for _, i := range s {
-		// разбиваем по цифре
-		// получаем смещение для первой НЕцифры
-		offset := strings.IndexFunc(i, func(r rune) bool { return r < '0' || r > '9' })
-		if offset == 0 {
-			// если пустая строка
-			// т.е. нет цифры
-			str = append(str, i)
-			break
-		}
-		// превращаем в цисло
-		val, err := strconv.Atoi(i[:offset])
-		checkError(err)
-		// добавляем в мап, где ключом выступает цифра, а значением - строка
-		m[int(val)] = i
-	}
-
-	values := []int{}
-	for k := range m {
-		// добавляем ключи из карты в слайс
-		values = append(values, k)
-	}
-
-	// сортируем этот слайс
-	sort.Ints(values)
-
-	// проходим по отсортированному слайсу
-	for _, i := range values {
-		// добавляем значение по этому ключу из мапы
-		str = append(str, m[i])
-	}
-	return str
-}
-
-// сортировка по заданной колонке
-func columnSort(s []string, k int) []string {
-	m := make(map[string][]string)
 	// проходим циклом по строкам
-	for _, i := range s {
-		// разделяем их по колонкам
+	for _, i := range arr {
+		// разделяем каждую
 		arrS := strings.Split(i, " ")
-		// добавляем ключ в виде строки в нужной колонке
-		// значение - вся строка
-		m[arrS[k]] = arrS
-	}
-	keyArr := []string{}
-	for key := range m {
-		// добавляем в слайс ключи (выбранные колонки)
-		keyArr = append(keyArr, key)
+
+		// проверяем, не задана ли колонка больше, чем всего их
+		if k > len(arrS) {
+			// если да, то сортировать будем по первому элементу
+			trueKey = arrS[0]
+		} else {
+			// если нет, то по заданному
+			trueKey = arrS[k]
+		}
+
+		// если нужно сортировать по числам
+		if n {
+			// находим смещение НЕцифры у элемента с индексом "заданный номер колонки -1"
+			offset := strings.IndexFunc(trueKey, func(r rune) bool { return r < '0' || r > '9' })
+			// задаем индекс для строк без чисел (выводятся вперед)
+			notIntIndex := 0
+			// если числа нет
+			if offset == 0 {
+				// уменьшвем индекс
+				notIntIndex--
+				// переводим его в строку
+				integer := strconv.Itoa(notIntIndex)
+				// ставим ключом в мапе, вся строка является значением
+				interimMap[integer] = i
+				break
+			}
+			// если была цифра, то делаем ее в виде строки ключом
+			integer := trueKey[:offset]
+			// всю строку делаем значением
+			interimMap[integer] = i
+		} else {
+			//	если флаг n не задан, то добвялем выбранную колонку ключом, всю строку значением
+			interimMap[trueKey] = i
+		}
 	}
 
-	// сортируем их
-	sort.Strings(keyArr)
+	//теперь мы имеем промежуточную мапу, где ключи - элемент, по которому надо сортировать
+	// а значение - сама строка
 
-	str := []string{}
+	// проходим по ключам в мапе
+	for key := range interimMap {
+		if n {
+			intKey, err := strconv.Atoi(key)
+			checkError(err)
+			intKeyArr = append(intKeyArr, intKey)
+		} else {
+			// и добавляем их в слайс ключей для дальнейшей сортировки
+			keyArr = append(keyArr, key)
+		}
+	}
+
+	// если нужно сортировать реверсивно
+	if r {
+		// выполняем сортировку слайса ключей в обратном порядке
+
+		if n {
+			sort.Sort(sort.Reverse(sort.IntSlice(intKeyArr)))
+			for _, i := range intKeyArr {
+				keyArr = append(keyArr, strconv.Itoa(i))
+			}
+		} else {
+			sort.Sort(sort.Reverse(sort.StringSlice(keyArr)))
+		}
+	} else {
+		//	если обычная сортировка
+		// то просто сортируем ключи
+
+		if n {
+			sort.Ints(intKeyArr)
+			for _, i := range intKeyArr {
+				keyArr = append(keyArr, strconv.Itoa(i))
+			}
+		} else {
+			sort.Strings(keyArr)
+		}
+
+	}
+
+	// проходим по каждому элементу в отсортированном слайсе ключей
 	for _, key := range keyArr {
-		// проходим по отсортированной колонке
-		// добавляем значение всей строки
-		ss := m[key][0] + " " + m[key][1]
-		str = append(str, ss)
+		str := interimMap[key]
+		// проверяем, нужно ли выводить строки с повторениями
+		// если нет
+		if u {
+			// проверяем, если ли строка уже в конечном ответе
+			if Find(allStr, str) {
+				// если да, то пропускаем
+				continue
+			} else {
+				// если нет,то добавляем
+				allStr = append(allStr, str)
+			}
+		} else {
+			// если нужны все строки
+			allStr = append(allStr, str)
+		}
 	}
-
-	return str
+	return allStr
 }
