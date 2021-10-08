@@ -51,14 +51,19 @@ func (t *TelnetClient) Receive() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Text received")
 	return nil
 }
 
 func (t *TelnetClient) Send(text string) error {
 	_, err := t.conn.Write([]byte(text))
 	if err != nil {
+		if err == io.EOF {
+			err = fmt.Errorf("error: closed")
+		}
 		return err
 	}
+	fmt.Println("Text sent")
 	return nil
 }
 
@@ -135,9 +140,7 @@ func Run(client *TelnetClient) {
 				return
 			case err := <-errors:
 				log.Println(err)
-				if err != nil {
-					return
-				}
+				return
 			default:
 				continue
 			}
