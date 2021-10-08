@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -91,16 +90,15 @@ func (e *EventsManager) CreateEvent(userID int, eventID int, title string, descr
 
 // UpdateEvent - функция изменения информации о событии менеджером
 func (e *EventsManager) UpdateEvent(userID int, eventID int, title string, description string, date Date) error {
-	var exist bool // проверка на существование события
-	var index int
+	// проверка на существование события
+	var index = -1
 	for i, e := range Events {
 		if e.EventID == eventID {
-			exist = true
 			index = i
 			break
 		}
 	}
-	if !exist {
+	if index == -1 {
 		return errors.New("event doesn't exist")
 	}
 
@@ -113,16 +111,15 @@ func (e *EventsManager) UpdateEvent(userID int, eventID int, title string, descr
 
 // DeleteEvent - функция удаление события менеджером
 func (e *EventsManager) DeleteEvent(eventID int) error {
-	var exist bool // проверка на существование события
+	// проверка на существование события
 	var index int
 	for i, e := range Events {
 		if e.EventID == eventID {
-			exist = true
 			index = i
 			break
 		}
 	}
-	if !exist {
+	if index == -1 {
 		return errors.New("event doesn't exist")
 	}
 	Events[index] = Events[len(Events)-1]
@@ -134,7 +131,7 @@ func (e *EventsManager) DeleteEvent(eventID int) error {
 func (e *EventsManager) EventsForDay(date Date) ([]Event, error) {
 	var DayEvents []Event
 	for _, e := range Events {
-		if date.Day() == e.Date.Day() && date.Month() == e.Date.Month() && date.Year() == e.Date.Year() {
+		if e.Date == date {
 			DayEvents = append(DayEvents, e)
 		}
 	}
@@ -260,7 +257,7 @@ func (h *Handler) eventsForDay(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_, err = w.Write([]byte(fmt.Sprint(eventTime.Format(layout2)) + "\n"))
+
 	if err != nil {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -281,7 +278,6 @@ func (h *Handler) eventsForWeek(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_, err = w.Write([]byte(fmt.Sprint(eventTime.Format(layout2)) + "\n"))
 	if err != nil {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -305,7 +301,6 @@ func (h *Handler) eventsForMonth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, err = w.Write([]byte(fmt.Sprint(eventTime.Month()) + " " + fmt.Sprint(eventTime.Year()) + "\n"))
 	if err != nil {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
