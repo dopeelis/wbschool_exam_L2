@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -59,9 +60,9 @@ type IEvent interface {
 	CreateEvent(userID int, eventID int, title string, description string, date Date) error
 	UpdateEvent(userID int, eventID int, title string, description string, date Date) error
 	DeleteEvent(eventID int) error
-	EventsForDay(date Date) ([]Event, error)
-	EventsForWeek(date Date) ([]Event, error)
-	EventsForMonth(date Date) ([]Event, error)
+	EventsForDay(date Date, userID int) ([]Event, error)
+	EventsForWeek(date Date, userID int) ([]Event, error)
+	EventsForMonth(date Date, userID int) ([]Event, error)
 }
 
 // Service - сервис, отвечающий за выполнение методов
@@ -128,10 +129,10 @@ func (e *EventsManager) DeleteEvent(eventID int) error {
 }
 
 // EventsForDay - функция вывода событий за день менеджером
-func (e *EventsManager) EventsForDay(date Date) ([]Event, error) {
+func (e *EventsManager) EventsForDay(date Date, userID int) ([]Event, error) {
 	var DayEvents []Event
 	for _, e := range Events {
-		if e.Date == date {
+		if e.Date == date && e.UserID == userID {
 			DayEvents = append(DayEvents, e)
 		}
 	}
@@ -139,12 +140,12 @@ func (e *EventsManager) EventsForDay(date Date) ([]Event, error) {
 }
 
 // EventsForWeek - функция вывода событий за неделю менеджером
-func (e *EventsManager) EventsForWeek(date Date) ([]Event, error) {
+func (e *EventsManager) EventsForWeek(date Date, userID int) ([]Event, error) {
 	var WeekEvents []Event
 	for _, e := range Events {
 		year1, week1 := date.ISOWeek()
 		year2, week2 := e.Date.ISOWeek()
-		if year1 == year2 && week1 == week2 {
+		if year1 == year2 && week1 == week2 && e.UserID == userID {
 			WeekEvents = append(WeekEvents, e)
 		}
 	}
@@ -152,10 +153,10 @@ func (e *EventsManager) EventsForWeek(date Date) ([]Event, error) {
 }
 
 // EventsForMonth - функция вывода событий за месяц менеджером
-func (e *EventsManager) EventsForMonth(date Date) ([]Event, error) {
+func (e *EventsManager) EventsForMonth(date Date, userID int) ([]Event, error) {
 	var MonthEvents []Event
 	for _, e := range Events {
-		if date.Month() == e.Date.Month() && date.Year() == e.Date.Year() {
+		if date.Month() == e.Date.Month() && date.Year() == e.Date.Year() && e.UserID == userID {
 			MonthEvents = append(MonthEvents, e)
 		}
 	}
@@ -251,6 +252,8 @@ func (h *Handler) deleteEvent(w http.ResponseWriter, r *http.Request) {
 
 // eventsForDay(Handler) - функция вывода событий за день обработчиком
 func (h *Handler) eventsForDay(w http.ResponseWriter, r *http.Request) {
+	userIDstr := r.URL.Query().Get("user_id")
+	userID, err := strconv.Atoi(userIDstr)
 	date := r.URL.Query().Get("date")
 	eventTime, err := time.Parse(layout2, date)
 	if err != nil {
@@ -262,7 +265,7 @@ func (h *Handler) eventsForDay(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	events, err := h.Services.EventsForDay(Date{eventTime})
+	events, err := h.Services.EventsForDay(Date{eventTime}, userID)
 	if err != nil {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -272,6 +275,8 @@ func (h *Handler) eventsForDay(w http.ResponseWriter, r *http.Request) {
 
 // eventsForWeek(Handler) - функция вывода событий за неделю обработчиком
 func (h *Handler) eventsForWeek(w http.ResponseWriter, r *http.Request) {
+	userIDstr := r.URL.Query().Get("user_id")
+	userID, err := strconv.Atoi(userIDstr)
 	date := r.URL.Query().Get("date")
 	eventTime, err := time.Parse(layout2, date)
 	if err != nil {
@@ -282,7 +287,7 @@ func (h *Handler) eventsForWeek(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	events, err := h.Services.EventsForWeek(Date{eventTime})
+	events, err := h.Services.EventsForWeek(Date{eventTime}, userID)
 	if err != nil {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -292,6 +297,8 @@ func (h *Handler) eventsForWeek(w http.ResponseWriter, r *http.Request) {
 
 // eventsForMonth(Handler) - функция вывода событий за месяц обработчиком
 func (h *Handler) eventsForMonth(w http.ResponseWriter, r *http.Request) {
+	userIDstr := r.URL.Query().Get("user_id")
+	userID, err := strconv.Atoi(userIDstr)
 	date := r.URL.Query().Get("date")
 	eventTime, err := time.Parse(layout3, date)
 	if err != nil {
@@ -305,7 +312,7 @@ func (h *Handler) eventsForMonth(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	events, err := h.Services.EventsForMonth(Date{eventTime})
+	events, err := h.Services.EventsForMonth(Date{eventTime}, userID)
 	if err != nil {
 		ErrorResponse(w, err.Error(), http.StatusServiceUnavailable)
 		return
