@@ -20,10 +20,13 @@ func main() {
 			Name:  "netcat",
 			Usage: "netcat client realization",
 			Flags: []cli.Flag{
-				&cli.StringFlag{Name: "protocol"},
+				&cli.BoolFlag{Name: "u"},
 			},
 			Action: func(c *cli.Context) error {
-				client := NewNetCatClient(c.Args().Slice()[0], c.Args().Slice()[1], c.String("protocol"))
+				if len(c.Args().Slice()) < 2 {
+					log.Fatalln("usage: netcat [--u] host port")
+				}
+				client := NewNetCatClient(c.Args().Slice()[0], c.Args().Slice()[1], c.Bool("u"))
 				err := Run(client)
 				if err != nil {
 					fmt.Println(err)
@@ -41,19 +44,26 @@ func main() {
 type NetCatClient struct {
 	host     string
 	port     string
-	protocol string
+	protocol bool
 }
 
-func NewNetCatClient(host, port string, protocol string) *NetCatClient {
+func NewNetCatClient(host, port string, u bool) *NetCatClient {
 	return &NetCatClient{
 		host:     host,
 		port:     port,
-		protocol: protocol,
+		protocol: u,
 	}
 }
 
 func Run(nc *NetCatClient) error {
-	conn, err := net.Dial(nc.protocol, net.JoinHostPort(nc.host, nc.port))
+	var protocol string
+	if nc.protocol {
+		protocol = "upd"
+	} else {
+		protocol = "tcp"
+	}
+	fmt.Println("protocol:", protocol)
+	conn, err := net.Dial(protocol, net.JoinHostPort(nc.host, nc.port))
 	if err != nil {
 		return err
 	}

@@ -3,15 +3,15 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/shirou/gopsutil/v3/process"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
-
-	"github.com/mitchellh/go-ps"
+	"syscall"
 )
 
-// функция для проверки ошибок
+// checkErr функция для проверки ошибок
 func checkErr(err error) {
 	if err != nil {
 		log.Fatalln()
@@ -131,12 +131,73 @@ func echo(s []string) {
 
 // сигнал для остановки конкретного приложения
 func kill(s []string) {
+	var prs []string
+	var signal syscall.Signal
+	var strSignal string
+	for i, w := range s[0] {
+		if i == 0 {
+			if string(w) == "S" || string(w) == "-" {
+				strSignal = s[0]
+				prs = s[1:]
+			} else {
+				signal = syscall.SIGTERM
+				prs = s
+			}
+			break
+		}
+		break
+	}
 
+	switch strSignal {
+	case "SIGKILL":
+		signal = syscall.SIGKILL
+	case "SIGINT":
+		signal = syscall.SIGINT
+	case "SIGTERM":
+		signal = syscall.SIGTERM
+	case "SIGQUIT":
+		signal = syscall.SIGQUIT
+	case "SIGABRT":
+		signal = syscall.SIGABRT
+	case "SIGHUP":
+		signal = syscall.SIGHUP
+	case "-9":
+		signal = syscall.SIGKILL
+	case "-1":
+		signal = syscall.SIGHUP
+	}
+
+	processes, err := process.Processes()
+	if err != nil {
+		log.Println(err)
+	}
+	for _, p := range processes {
+		n, err := p.Name()
+		if err != nil {
+			log.Println(err)
+		}
+		for _, pp := range prs {
+			if n == pp {
+				err := p.SendSignal(signal)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}
+	log.Println("process not found")
 }
 
 // возвращаем все текущие процессы
-func prs() []ps.Process {
-	prs, err := ps.Processes()
-	checkErr(err)
-	return prs
+func prs() []int32 {
+	processes, err := process.Processes()
+	if err != nil {
+		log.Println(err)
+	}
+	var pids []int32
+
+	for _, p := range processes {
+		pids = append(pids, p.Pid)
+	}
+	return pids
 }
