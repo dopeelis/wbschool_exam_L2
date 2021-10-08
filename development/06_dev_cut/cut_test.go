@@ -1,8 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
-// функция сравнения двух слайсов
+// Equal функция сравнения двух слайсов
 func Equal(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -15,15 +17,19 @@ func Equal(a, b []string) bool {
 	return true
 }
 
-// тестирование функции "вырезания" по колонке
-func TestFields(t *testing.T) {
+// тестирование функции Cut
+func TestCut(t *testing.T) {
 	testTable := []struct {
-		field    int
+		f        int
+		d        string
+		s        bool
 		data     []string
 		expected []string
 	}{
 		{
-			field: 2,
+			f: 2,
+			d: "\t",
+			s: false,
 			data: []string{
 				"Winter\tcold\t0",
 				"Summer\thot\t10",
@@ -38,7 +44,9 @@ func TestFields(t *testing.T) {
 			},
 		},
 		{
-			field: 3,
+			f: 3,
+			d: "\t",
+			s: false,
 			data: []string{
 				"245:789\t4567\tM:4540\tAdmin\t01:10:1980",
 				"535:763\t4987\tM:3476\tSales\t11:04:1978",
@@ -48,27 +56,10 @@ func TestFields(t *testing.T) {
 				"M:3476\n",
 			},
 		},
-	}
-
-	for _, testCase := range testTable {
-		result := fields(testCase.field, testCase.data)
-		if !Equal(result, testCase.expected) {
-			t.Errorf("Incorrect result. Expect: %v, Got %v\n", testCase.expected, result)
-		}
-	}
-}
-
-// тестирование функции "вырезания" по колонке и разделителю
-func TestDelimiter(t *testing.T) {
-	testTable := []struct {
-		field     int
-		delimiter string
-		data      []string
-		expected  []string
-	}{
 		{
-			field:     2,
-			delimiter: ":",
+			f: 2,
+			d: ":",
+			s: false,
 			data: []string{
 				"Winter:cold:0",
 				"Summer:hot:10",
@@ -83,8 +74,9 @@ func TestDelimiter(t *testing.T) {
 			},
 		},
 		{
-			field:     3,
-			delimiter: " ",
+			f: 3,
+			d: " ",
+			s: false,
 			data: []string{
 				"Winter cold 0",
 				"Summer:hot:10",
@@ -93,28 +85,15 @@ func TestDelimiter(t *testing.T) {
 			},
 			expected: []string{
 				"0\n",
+				"",
+				"",
 				"7\n",
 			},
 		},
-	}
-
-	for _, testCase := range testTable {
-		result := delimiter(testCase.field, testCase.delimiter, testCase.data)
-		if !Equal(result, testCase.expected) {
-			t.Errorf("Incorrect result. Expect: %v, Got %v\n", testCase.expected, result)
-		}
-	}
-}
-
-// // тестирование функции "вырезания" по колонке строк с разделителем
-func TestSeparated(t *testing.T) {
-	testTable := []struct {
-		field    int
-		data     []string
-		expected []string
-	}{
 		{
-			field: 2,
+			f: 2,
+			d: "\t",
+			s: true,
 			data: []string{
 				"Winter\tcold\t0",
 				"Summer\thot\t10",
@@ -129,7 +108,9 @@ func TestSeparated(t *testing.T) {
 			},
 		},
 		{
-			field: 3,
+			f: 3,
+			d: "\t",
+			s: true,
 			data: []string{
 				"Winter\tcold\t0",
 				"Summer:hot:10",
@@ -138,13 +119,18 @@ func TestSeparated(t *testing.T) {
 			},
 			expected: []string{
 				"0\n",
+				"",
+				"",
 				"7\n",
 			},
 		},
 	}
 
 	for _, testCase := range testTable {
-		result := separated(testCase.field, testCase.data)
+		var result []string
+		for _, str := range testCase.data {
+			result = append(result, Cut(str, testCase.f, testCase.d, testCase.s))
+		}
 		if !Equal(result, testCase.expected) {
 			t.Errorf("Incorrect result. Expect: %v, Got %v\n", testCase.expected, result)
 		}
