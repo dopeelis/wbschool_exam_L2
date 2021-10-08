@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 )
 
 func main() {
 	// объявляем флаги
-	An := flag.Int("A", 0, "'after' печатать +N строк после совпадения")
-	Bn := flag.Int("B", 0, "'before' печатать +N строк до совпадения")
+	A := flag.Int("A", 0, "'after' печатать +N строк после совпадения")
+	B := flag.Int("B", 0, "'before' печатать +N строк до совпадения")
 	C := flag.Int("C", 0, "'context' (A+B) печатать ±N строк вокруг совпадения")
 	c := flag.Bool("c", false, "'count' (количество строк)")
 	i := flag.Bool("i", false, "'ignore-case' (игнорировать регистр)")
@@ -23,166 +22,29 @@ func main() {
 
 	flag.Parse()
 
-	// проверяем количество входных данных, все ли введено
-	if len(os.Args) < 3 {
-		fmt.Println("No file or expression")
-		return
+	args := flag.Args()
+
+	if len(args) < 2 {
+		log.Fatalln("usage: [flags] [pattern or string] [file]")
 	}
 
-	// если не добавлены никакие флаги
-	if *An == 0 && *Bn == 0 && *C == 0 && !*c && !*i && !*v && !*F && !*n {
-		f := os.Args[len(os.Args)-1]
-		// выделяем нужную для поиска фразу
-		phrase := os.Args[1 : len(os.Args)-1]
-		// превращаем ее в строку
-		allPhrase := strings.Join(phrase, " ")
-		// читаем файл
-		file, err := ioutil.ReadFile(f)
-		if err != nil {
-			log.Fatalln(err)
-		}
+	// выделяем из запроса фразу, которую будем искать
+	slicePhrase := args[:len(args)-1]
+	phrase := strings.Join(slicePhrase, " ")
 
-		splitStr := strings.Split(string(file), "\n")
-
-		// выполняем обычный поиск
-		res := simpleSearch(allPhrase, splitStr)
-		// выводим результат и завершаем программу
-		fmt.Println(res)
-		return
+	// читаем данные из файла
+	file, err := ioutil.ReadFile(args[len(args)-1])
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	// если какой-то из флагов был добавлен
-	if *An != 0 || *Bn != 0 || *C != 0 || *c || *i || *v || *F || *n {
-		if *An != 0 || *Bn != 0 || *C != 0 {
-			f := os.Args[len(os.Args)-1]
-			// выделяем фразу, начиная с другой позиции
-			phrase := os.Args[3 : len(os.Args)-1]
-			allPhrase := strings.Join(phrase, " ")
-			// читаем файл
-			file, err := ioutil.ReadFile(f)
-			if err != nil {
-				log.Fatalln(err)
-			}
+	splitString := strings.Split(string(file), "\n")
 
-			splitStr := strings.Split(string(file), "\n")
-
-			if *An != 0 {
-				res := ASearch(allPhrase, splitStr, *An)
-				fmt.Println(res)
-			}
-			if *Bn != 0 {
-				res := BSearch(allPhrase, splitStr, *Bn)
-				fmt.Println(res)
-			}
-			if *C != 0 {
-				res := CSearch(allPhrase, splitStr, *C)
-				fmt.Println(res)
-			}
-
-		} else {
-			f := os.Args[len(os.Args)-1]
-			phrase := os.Args[2 : len(os.Args)-1]
-			allPhrase := strings.Join(phrase, " ")
-			file, err := ioutil.ReadFile(f)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			splitStr := strings.Split(string(file), "\n")
-
-			if *c {
-				res := countSearch(allPhrase, splitStr)
-				fmt.Println(res)
-			}
-			if *i {
-				res := ignoreCaseSearch(allPhrase, splitStr)
-				fmt.Println(res)
-			}
-			if *v {
-				res := invertSearch(allPhrase, splitStr)
-				fmt.Println(res)
-			}
-			if *F {
-				res := fixedtSearch(allPhrase, splitStr)
-				fmt.Println(res)
-			}
-			if *n {
-				res := lineNumSearch(allPhrase, splitStr)
-				fmt.Println(res)
-			}
-		}
-	}
+	// запускаем функцию и выводим на экран
+	fmt.Println(Grep(phrase, splitString, *A, *B, *C, *c, *i, *v, *F, *n))
 }
 
-// функция простого поиска фразы
-func simpleSearch(phrase string, text []string) []string {
-	res := []string{}
-	for _, i := range text {
-		if strings.Contains(i, phrase) {
-			res = append(res, i+"\n")
-		}
-	}
-	return res
-}
-
-// функция вывода количества найденных совпадений
-func countSearch(phrase string, text []string) int {
-	counter := 0
-	for _, i := range text {
-		if strings.Contains(i, phrase) {
-			counter++
-		}
-	}
-	return counter
-}
-
-// функция поиска в выводом номера строки
-func lineNumSearch(phrase string, text []string) []string {
-	res := []string{}
-	for i, s := range text {
-		if strings.Contains(s, phrase) {
-			ss := strconv.Itoa(i+1) + " " + s + "\n"
-			res = append(res, ss)
-		}
-	}
-	return res
-}
-
-// функция вывода строк НЕ содержащих фразу
-func invertSearch(phrase string, text []string) []string {
-	res := []string{}
-	for _, i := range text {
-		if !strings.Contains(i, phrase) {
-			res = append(res, i+"\n")
-		}
-	}
-	return res
-}
-
-// функция поиска полного совпадения со строкой
-func fixedtSearch(phrase string, text []string) []string {
-	res := []string{}
-	for _, i := range text {
-		if phrase == i {
-			res = append(res, i+"\n")
-		}
-	}
-	return res
-}
-
-// функция поиска, игнорирующая регистр
-func ignoreCaseSearch(phrase string, text []string) []string {
-	res := []string{}
-	phrase = strings.ToLower(phrase)
-	for _, i := range text {
-		if strings.Contains(strings.ToLower(i), phrase) {
-			res = append(res, i+"\n")
-		}
-	}
-	return res
-}
-
-// функция поиска элементка в слайсе
-// нужна для функций ASearch, BSearch, CSearch
+// Find функция поиска элемента в слайсе
 func Find(slice []string, val string) bool {
 	for _, item := range slice {
 		if item == val {
@@ -194,75 +56,138 @@ func Find(slice []string, val string) bool {
 	return false
 }
 
-// функция, выводящая нужную строку +n строк после нее
-func ASearch(phrase string, text []string, n int) []string {
-	res := []string{}
-	for i, s := range text {
-		if strings.Contains(s, phrase) { //если нашли совпадение
-			if i > len(text)-1-n { // если в конце текста
-				for j := 0; j < len(text)-i+1; j++ {
-					if !Find(res, text[i]+"\n") { // чтобы не выводить повторы
-						res = append(res, text[i]+"\n")
-						i++
-					} else {
-						i++
+// Grep функция поиска фразы или строки в файле с применением доп.условий
+func Grep(phrase string, text []string, A, B, C int, c, i, v, F, n bool) []string {
+	// переменная для флага -с
+	var stringCount = 0
+	var result []string
+	// условие сравнения
+	var condition bool
+
+	// согласовывем флаги А В и С
+	// чтобы работало бОльшее значение
+	if C != 0 && C > A && C > B {
+		A = C
+		B = C
+	} else if C != 0 && (C > A || C > B) {
+		if C > A {
+			A = C
+		} else if C > B {
+			B = C
+		}
+	}
+
+	// проходим по каждой строке
+	for index, str := range text {
+		// если применен -i, убираем регистр
+		if i {
+			str = strings.ToLower(str)
+			phrase = strings.ToLower(phrase)
+		}
+		// меняем условие в зависимсоти от переданных флагов
+		if F {
+			// если нужно искать полное совпедаение
+			condition = phrase == str
+		} else if v && F {
+			// все, кроме полного совпадения
+			condition = phrase != str
+		} else if v && !F {
+			// все, кроме фразы в строке
+			condition = !strings.Contains(str, phrase)
+		} else {
+			// просто фразу в строке
+			condition = strings.Contains(str, phrase)
+		}
+		// если условие выполняется
+		if condition {
+			// увеличиваем счетчик положительных результатов
+			stringCount++
+			// выполняем, если задан -B
+			if B != 0 {
+				if index <= B-1 { // если вначале текста
+					for j := index; j >= 0; j-- { // выводи столько строк, сколько до начала
+						if !Find(result, text[index-j]) { // чтобы не выводить повторы
+							// если нужно доабвлять номер строки в выводе
+							if n {
+								result = append(result, strconv.Itoa(index-j+1)+" "+text[index-j])
+							} else {
+								result = append(result, text[index-j])
+							}
+						} else {
+							continue
+						}
+					}
+				} else {
+					for j := B; j >= 0; j-- { // выводим столько строчек, сколько задано
+						if !Find(result, text[index-j]) { // чтобы не выводить повторы
+							// если нужно доабвлять номер строки в выводе
+							if n {
+								result = append(result, strconv.Itoa(index-j+1)+" "+text[index-j])
+							} else {
+								result = append(result, text[index-j])
+							}
+						} else {
+							continue
+						}
 					}
 				}
-			} else {
-				for j := 0; j < n+1; j++ { // выводим столько строчек, сколько задано
-					if !Find(res, text[i]+"\n") { // чтобы не выводить повторы
-						res = append(res, text[i]+"\n")
-						i++
-					} else {
-						i++
-					}
+			}
 
+			// выполняем , если задан -A
+			if A != 0 {
+				if index > len(text)-1-A { // если в конце текста
+					for j := 0; j < len(text)-index+1; j++ { // выводим столько строк, сколько осталось в конце
+						if !Find(result, text[index]) { // чтобы не выводить повторы
+							// если нужно доабвлять номер строки в выводе
+							if n {
+								result = append(result, strconv.Itoa(index+1)+" "+text[index])
+							} else {
+								result = append(result, text[index])
+							}
+							index++
+						} else {
+							index++
+						}
+					}
+				} else {
+					for j := 0; j < A+1; j++ { // выводим столько строчек, сколько задано
+						if !Find(result, text[index]) { // чтобы не выводить повторы
+							// если нужно доабвлять номер строки в выводе
+							if n {
+								result = append(result, strconv.Itoa(index+1)+" "+text[index])
+							} else {
+								result = append(result, text[index])
+							}
+							index++
+						} else {
+							index++
+						}
+
+					}
+				}
+			}
+			// если оба не заданы, то просто добавляем совпадение в результат
+			if A == 0 && B == 0 {
+				if n {
+					result = append(result, strconv.Itoa(index+1)+" "+text[index])
+				} else {
+					result = append(result, text[index])
 				}
 			}
 		}
 	}
-	return res
-}
 
-// функция, выводящая нужную строку +n строк после до
-func BSearch(phrase string, text []string, n int) []string {
-	res := []string{}
-	for i, s := range text {
-		if strings.Contains(s, phrase) { //если нашли совпадение
-			if i <= n-1 { // если вначале текста
-				for j := i; j >= 0; j-- {
-					if !Find(res, text[i-j]+"\n") { // чтобы не выводить повторы
-						res = append(res, text[i-j]+"\n")
-					} else {
-						continue
-					}
-				}
-			} else {
-				for j := n; j >= 0; j-- { // выводим столько строчек, сколько задано
-					if !Find(res, text[i-j]+"\n") { // чтобы не выводить повторы
-						res = append(res, text[i-j]+"\n")
-					} else {
-						continue
-					}
-				}
-			}
-		}
-	}
-	return res
-}
-
-// функция, выводящая нужную строку +n строк до и после нее
-func CSearch(phrase string, text []string, n int) []string {
-	// выполняем вывод строк до и после
-	res := BSearch(phrase, text, n)
-	aSearch := ASearch(phrase, text, n)
-
-	// убираем повторы
-	for _, s := range aSearch {
-		if !Find(res, s) {
-			res = append(res, s)
-		}
+	// если нужно вывести соличество совпадений
+	if c {
+		count := strconv.Itoa(stringCount)
+		result = []string{count}
 	}
 
-	return res
+	// финальное предствление ответа
+	var finalResult []string
+	for _, s := range result {
+		// применяем ко всем элементам \n
+		finalResult = append(finalResult, s+"\n")
+	}
+	return finalResult
 }
