@@ -58,7 +58,7 @@ func NewNetCatClient(host, port string, u bool) *NetCatClient {
 func Run(nc *NetCatClient) error {
 	var protocol string
 	if nc.protocol {
-		protocol = "upd"
+		protocol = "udp"
 	} else {
 		protocol = "tcp"
 	}
