@@ -27,14 +27,16 @@ func main() {
 
 	// если файл не добавлен
 	if len(args) == 0 {
-		reader := bufio.NewReader(os.Stdin) //читаем с ввода
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatalln(err)
+		for {
+			reader := bufio.NewReader(os.Stdin) //читаем с ввода
+			text, err := reader.ReadString('\n')
+			if err != nil {
+				log.Fatalln(err)
+			}
+			// "вырезаем" по указанной колонке
+			res := Cut(text, *f, *d, *s)
+			fmt.Println(res)
 		}
-		// "вырезаем" по указанной колонке
-		res := Cut(text, *f, *d, *s)
-		fmt.Println(res)
 		return
 	}
 

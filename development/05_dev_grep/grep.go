@@ -88,15 +88,13 @@ func Grep(phrase string, text []string, A, B, C int, c, i, v, F, n bool) []strin
 		if F {
 			// если нужно искать полное совпедаение
 			condition = phrase == str
-		} else if v && F {
-			// все, кроме полного совпадения
-			condition = phrase != str
-		} else if v && !F {
-			// все, кроме фразы в строке
-			condition = !strings.Contains(str, phrase)
 		} else {
 			// просто фразу в строке
 			condition = strings.Contains(str, phrase)
+		}
+		// если -v
+		if v {
+			condition = !condition
 		}
 		// если условие выполняется
 		if condition {
