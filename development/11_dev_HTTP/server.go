@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -24,7 +25,7 @@ func main() {
 
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
-		ErrorResponse(nil, err.Error(), http.StatusInternalServerError)
+		log.Fatalln("Listen error:", err)
 	}
 }
 
@@ -43,6 +44,7 @@ type Date struct {
 
 // Events - хранилище все событий
 var Events []Event
+var mu *sync.Mutex
 
 // UnmarshalJSON - функция для возможности ввода даты в нужном нам формате
 func (t *Date) UnmarshalJSON(date []byte) error {
@@ -91,6 +93,7 @@ func (e *EventsManager) CreateEvent(userID int, eventID int, title string, descr
 
 // UpdateEvent - функция изменения информации о событии менеджером
 func (e *EventsManager) UpdateEvent(userID int, eventID int, title string, description string, date Date) error {
+	mu.Lock()
 	// проверка на существование события
 	var index = -1
 	for i, e := range Events {
@@ -107,11 +110,13 @@ func (e *EventsManager) UpdateEvent(userID int, eventID int, title string, descr
 	Events[index].Date = date
 	Events[index].Title = title
 	Events[index].Description = description
+	mu.Unlock()
 	return nil
 }
 
 // DeleteEvent - функция удаление события менеджером
 func (e *EventsManager) DeleteEvent(eventID int) error {
+	mu.Lock()
 	// проверка на существование события
 	var index int
 	for i, e := range Events {
@@ -125,22 +130,26 @@ func (e *EventsManager) DeleteEvent(eventID int) error {
 	}
 	Events[index] = Events[len(Events)-1]
 	Events = Events[:len(Events)-1]
+	mu.Unlock()
 	return nil
 }
 
 // EventsForDay - функция вывода событий за день менеджером
 func (e *EventsManager) EventsForDay(date Date, userID int) ([]Event, error) {
+	mu.Lock()
 	var DayEvents []Event
 	for _, e := range Events {
 		if e.Date == date && e.UserID == userID {
 			DayEvents = append(DayEvents, e)
 		}
 	}
+	mu.Unlock()
 	return DayEvents, nil
 }
 
 // EventsForWeek - функция вывода событий за неделю менеджером
 func (e *EventsManager) EventsForWeek(date Date, userID int) ([]Event, error) {
+	mu.Lock()
 	var WeekEvents []Event
 	for _, e := range Events {
 		year1, week1 := date.ISOWeek()
@@ -149,17 +158,20 @@ func (e *EventsManager) EventsForWeek(date Date, userID int) ([]Event, error) {
 			WeekEvents = append(WeekEvents, e)
 		}
 	}
+	mu.Unlock()
 	return WeekEvents, nil
 }
 
 // EventsForMonth - функция вывода событий за месяц менеджером
 func (e *EventsManager) EventsForMonth(date Date, userID int) ([]Event, error) {
+	mu.Lock()
 	var MonthEvents []Event
 	for _, e := range Events {
 		if date.Month() == e.Date.Month() && date.Year() == e.Date.Year() && e.UserID == userID {
 			MonthEvents = append(MonthEvents, e)
 		}
 	}
+	mu.Unlock()
 	return MonthEvents, nil
 }
 
